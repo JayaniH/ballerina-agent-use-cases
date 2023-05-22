@@ -367,7 +367,7 @@ public function main() returns error? {
         name: "Google_Search",
         path: "/customsearch/v1",
         method: agent:GET,
-        description: "useful to summarize a given text",
+        description: "useful to search the web using google search",
         queryParams: {
             'type: agent:OBJECT,
             properties: {
@@ -385,7 +385,7 @@ public function main() returns error? {
         name: "Get_Calendar_Events",
         path: "/calendar/v3/calendars/{calendarId}/events",
         method: agent:GET,
-        description: "useful to summarize a given text. the calendarId is the email address of the calendar user",
+        description: "useful to fetch calendar events. the calendarId is the email address of the calendar user",
         queryParams: {
             'type: agent:OBJECT,
             properties: {
