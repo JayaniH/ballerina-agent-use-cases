@@ -86,8 +86,6 @@ final sheets:Client gSheets = check new ({auth: {token: googleToken}});
 
 public function main() returns error? {
 
-    string query = "Do I have any email threads about birthdays?";
-
     // 1) Create the model (brain of the agent)
     agent:ChatGptModel model = check new ({auth: {token: openAIToken}});
 
@@ -136,7 +134,7 @@ public function main() returns error? {
 
     agent:Tool calculatorTool = {
         name: "Basic_Calculator",
-        description: "useful to do basic arithmetic operations (addition, subtraction, multiplication, division) for two given numbers",
+        description: "useful to do basic arithmetic operations (addition, subtraction, multiplication, division) for two given numbers. if there are multiple numbers, use this tool incrementally using two inputs at a time",
         inputSchema: {
             'type: agent:OBJECT,
             properties: {
@@ -156,7 +154,7 @@ public function main() returns error? {
             'type: agent:OBJECT,
             properties: {
                 url: {'type: agent:STRING},
-                downloadPath: {'type: agent:STRING, description: "path to the downloaded, including the file name"}
+                downloadPath: {'type: agent:STRING, description: "path to the downloaded file, including the file name"}
             },
             required: ["url", "downloadPath"]
         },
@@ -169,7 +167,7 @@ public function main() returns error? {
         inputSchema: {
             'type: agent:OBJECT,
             properties: {
-                spreadsheetId: {'type: agent:STRING, description: "id of the google sheet which can be found in the url of the sheet. e.g. 1kklddHCSpU8yBSCIbrE97-Ry9ugaS7xMIIH1cb37VPE"},
+                spreadsheetId: {'type: agent:STRING, description: "id of the google sheet which can be found in the url of the sheet. e.g. 1kklddHCSpU8yDSCIbrE97-Ry9ugaS7xMIIH1cb37VPE"},
                 sheetName: {'type: agent:STRING, description: "name of the worksheet to be read"},
                 range: {'type: agent:STRING, description: "range of cells to be read. e.g. A1:B2"}
             },
@@ -212,14 +210,14 @@ public function main() returns error? {
         inputSchema: {
             'type: agent:OBJECT,
             properties: {
-                theadId: {'type: agent:STRING, description: "id of the email thread to be read. this can be found in the email thread search results."}
+                theadId: {'type: agent:STRING, description: "id of the email thread to be read. the id can be found in the email thread search results."}
             },
             required: ["theadId"]
         },
         caller: readEmailThread
     };
 
-    // This is re-implemented as a HTTP tool
+    // This is re-implemented below as a HTTP tool
     // agent:Tool scrapeWebsiteTool = {
     //     name: "Scrape_Website",
     //     description: "useful to scrape content from a website",
@@ -268,9 +266,9 @@ public function main() returns error? {
             'type: agent:OBJECT,
             properties: {
                 prompt: {'type: agent:STRING, description: "the instruction which states information about the text to be generated"},
-                model: {'type: agent:STRING, default: "text-davinci-003"},
-                max_tokens: {'type: agent:INTEGER, default: 200},
-                temperature: {'type: agent:FLOAT, default: 0.7}
+                model: {'const: "text-davinci-003"},
+                max_tokens: {'const: 200},
+                temperature: {'const: 0.7}
             },
             required: ["prompt", "model"]
         }
@@ -285,11 +283,11 @@ public function main() returns error? {
             'type: agent:OBJECT,
             properties: {
                 prompt: {'type: agent:STRING, description: "the instruction which states information about the code to be generated"},
-                model: {'type: agent:STRING, default: "text-davinci-003"},
-                max_tokens: {'type: agent:INTEGER, default: 1000},
-                temperature: {'type: agent:FLOAT, default: 0.7}
+                model: {'const: "text-davinci-003"},
+                max_tokens: {'const: 1000},
+                temperature: {'const: 0.7}
             },
-            required: ["prompt", "model"]
+            required: ["prompt"]
         }
     };
 
@@ -317,11 +315,11 @@ public function main() returns error? {
             'type: agent:OBJECT,
             properties: {
                 prompt: {'type: agent:STRING, pattern: "Summarize the following text: \n <TEXT_CONTENT>"},
-                model: {'type: agent:STRING, default: "text-davinci-003"},
-                max_tokens: {'type: agent:INTEGER, default: 1000},
-                temperature: {'type: agent:FLOAT, default: 0.7}
+                model: {'const: "text-davinci-003"},
+                max_tokens: {'const: 200},
+                temperature: {'const: 0.7}
             },
-            required: ["prompt", "model"]
+            required: ["prompt"]
         }
     };
 
@@ -334,9 +332,9 @@ public function main() returns error? {
             'type: agent:OBJECT,
             properties: {
                 file: {'type: agent:STRING, pattern: "@<{AUDIO_FILE_PATH>"},
-                model: {'type: agent:STRING, default: "whisper-1"}
+                model: {'const: "whisper-1"}
             },
-            required: ["file", "model"]
+            required: ["file"]
         }
     };
 
@@ -349,11 +347,11 @@ public function main() returns error? {
             'type: agent:OBJECT,
             properties: {
                 prompt: {'type: agent:STRING, pattern: "Translate the following text to <TARGET_LANGUAGE>: \n <TEXT_CONTENT>"},
-                model: {'type: agent:STRING, default: "text-davinci-003"},
-                max_tokens: {'type: agent:INTEGER, default: 1000},
-                temperature: {'type: agent:FLOAT, default: 0.7}
+                model: {'const: "text-davinci-003"},
+                max_tokens: {'const: 1000},
+                temperature: {'const: 0.7}
             },
-            required: ["prompt", "model"]
+            required: ["prompt"]
         }
     };
 
@@ -371,11 +369,12 @@ public function main() returns error? {
         queryParams: {
             'type: agent:OBJECT,
             properties: {
-                'key: {'type: agent:STRING, default: googleSearchApiKey},
-                cx: {'type: agent:STRING, default: searchEngineId},
-                q: {'type: agent:STRING, description: "the search query"}
+                'key: {'const: googleSearchApiKey},
+                cx: {'const: searchEngineId},
+                q: {'type: agent:STRING, description: "the search query"},
+                num: {'const: "1"}
             },
-            required: ["key", "cx", "q"]
+            required: ["q"]
         }
     };
 
@@ -386,6 +385,11 @@ public function main() returns error? {
         path: "/calendar/v3/calendars/{calendarId}/events",
         method: agent:GET,
         description: "useful to fetch calendar events. the calendarId is the email address of the calendar user",
+        pathParams: {
+            properties: {
+                calendarId: {'type: agent:STRING}
+            }
+        },
         queryParams: {
             'type: agent:OBJECT,
             properties: {
@@ -433,6 +437,12 @@ public function main() returns error? {
         path: "/v1/users/{authorId}/posts",
         method: agent:POST,
         description: "useful to post an article on medium",
+        pathParams: {
+            properties: {
+                authorId: {'type: agent:STRING}
+            },
+            required: ["authorId"]
+        },
         requestBody: {
             'type: agent:OBJECT,
             properties: {
@@ -454,15 +464,15 @@ public function main() returns error? {
         queryParams: {
             'type: agent:OBJECT,
             properties: {
-                api_key: {'type: agent:STRING, default: dataflowkitToken}
-            },
-            required: ["api_key"]
+                api_key: {'const: dataflowkitToken}
+            }
         },
         requestBody: {
             'type: agent:OBJECT,
             properties: {
                 url: {'type: agent:STRING, description: "the url of the website to scrape"},
-                'type: {'type: agent:STRING, default: "base"}            },
+                'type: {'type: agent:STRING, 'enum: ["base", "chrome"], default: "base"}
+            },
             required: ["url", "type"]
         }
     };
@@ -474,7 +484,10 @@ public function main() returns error? {
 
     // 4) Run the agent with user's query
     decimal time_before = time:monotonicNow();
-    _ = agent.run(query, maxIter = 10, context = {"jane_email": "janetest152@gmail.com"});
+    
+    string query = "Give some creative content for a social media post for an ice cream business";
+    _ = agent.run(query, maxIter = 10, context = {"email": "janetest152@gmail.com"});
+
     decimal time_after = time:monotonicNow();
 
     io:print("Time taken to run the agent: " + (time_after - time_before).toString() + "s");
@@ -555,19 +568,19 @@ isolated function sendEmail(*SendEmailInput input) returns string|error {
         messageBody: input.emailBody,
         contentType: gmail:TEXT_HTML
     };
-    gmail:Message sendMessage = check gmail->sendMessage(messageRequest, userId = "me");
-    return sendMessage.toString();
+    _ = check gmail->sendMessage(messageRequest, userId = "me");
+    return "Successfully sent the email";
 }
 
 isolated function searchEmailThread(*SearchEmailThreadInput input) returns string|error {
     gmail:MailThread[] threads = [];
 
-    stream<gmail:MailThread,error?> threadList = check gmail->listThreads(filter = {includeSpamTrash: false, labelIds: ["INBOX"], q: input.searchQuery});
-        
-    _ = check from gmail:MailThread thread in threadList 
-    do {
-        threads.push(thread);
-    };
+    stream<gmail:MailThread, error?> threadList = check gmail->listThreads(filter = {includeSpamTrash: false, labelIds: ["INBOX"], q: input.searchQuery});
+
+    _ = check from gmail:MailThread thread in threadList
+        do {
+            threads.push(thread);
+        };
     return threads.toString();
 }
 
